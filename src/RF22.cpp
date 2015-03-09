@@ -80,9 +80,9 @@ uint8_t RF22::init()
     // start the SPI library:
     // Note the RF22 wants mode 0, MSB first and default to 1 Mbps
     _spi->begin();
-    //_spi->setDataMode(SPI_MODE0);
-    //_spi->setBitOrder(MSBFIRST);
-    //_spi->setClockDivider(SPI_CLOCK_DIV16);  // (16 Mhz / 16) = 1 MHz
+    _spi->setDataMode(0x0);
+    _spi->setBitOrder(0x0);
+    _spi->setClockDivider(0x1);  // (16 Mhz / 16) = 1 MHz
     usleep (100);
 
     // Software reset the device

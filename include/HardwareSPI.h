@@ -28,7 +28,7 @@ public:
     /// \return The octet read from SPI while the data octet was sent
     uint8_t transfer(uint8_t data) 
     {
-        spi = mraa_spi_init(5);
+        // return SPI.transfer(data);
         return 1;
     }
 
@@ -52,7 +52,7 @@ public:
     /// Initializes the SPI bus by setting SCK, MOSI, and SS to outputs, pulling SCK and MOSI low, and SS high. 
     void begin() 
     {
-        // return SPI.begin();
+        spi = mraa_spi_init(0);
     }
 
     /// Disables the SPI bus (leaving pin modes unchanged). 
@@ -68,7 +68,11 @@ public:
     /// \param[in] bitOrder Bit order to be used: LSBFIRST or MSBFIRST
     void setBitOrder(uint8_t bitOrder) 
     {
-        // SPI.setBitOrder (bitOrder);
+        if (bitOrder < 2)  {
+            mraa_spi_lsbmode(spi, bitOrder);
+        } else {
+            mraa_spi_lsbmode(spi, 0);
+        }
     }
 
     /// Sets the SPI data mode: that is, clock polarity and phase. 
@@ -76,7 +80,23 @@ public:
     /// \param[in] mode The mode to use: SPI_MODE0 SPI_MODE1 SPI_MODE2 SPI_MODE3 
     void setDataMode(uint8_t mode) 
     {
-        // SPI.setDataMode (mode);
+        switch (mode) {
+            case 0:
+                mraa_spi_mode (spi, MRAA_SPI_MODE0);
+                break;
+            case 1:
+                mraa_spi_mode (spi, MRAA_SPI_MODE1);
+                break;
+            case 2:
+                mraa_spi_mode (spi, MRAA_SPI_MODE2);
+                break;
+            case 3:
+                mraa_spi_mode (spi, MRAA_SPI_MODE3);
+                break;
+            default:
+                mraa_spi_mode (spi, MRAA_SPI_MODE0);
+                break;
+        }
     }
 
     /// Sets the SPI clock divider relative to the system clock. 
@@ -86,8 +106,40 @@ public:
     /// \param[in] rate The data rate to use: one of SPI_CLOCK_
     void setClockDivider(uint8_t rate) 
     {
-        // SPI.setClockDivider (rate);
-        // mraa_spi_frequency(spi, DW1000_SPI_CLOCK_SPEED);
+        /* SPI_CLOCK_DIV4 0x00
+        SPI_CLOCK_DIV16 0x01
+        SPI_CLOCK_DIV64 0x02
+        SPI_CLOCK_DIV128 0x03
+        SPI_CLOCK_DIV2 0x04
+        SPI_CLOCK_DIV8 0x05
+        SPI_CLOCK_DIV32 0x06 */
+        
+        switch (rate) {
+            case 0x00:
+                mraa_spi_frequency(spi, 4000000); // 4Mhz
+                break;
+            case 0x01:
+                mraa_spi_frequency(spi, 1000000); // 1Mhz
+                break;
+            case 0x02:
+                mraa_spi_frequency(spi, 250000); // 250Khz
+                break;
+            case 0x03:
+                mraa_spi_frequency(spi, 125000); // 125Khz
+                break;
+            case 0x04:
+                mraa_spi_frequency(spi, 8000000); // 8Mhz
+                break;
+            case 0x05:
+                mraa_spi_frequency(spi, 2000000); // 2Mhz
+                break;
+            case 0x06:
+                mraa_spi_frequency(spi, 500000); // 500Khz
+                break;
+            default:
+                mraa_spi_frequency(spi, 1000000); // 4Mhz
+                break;
+        }
     }
     
     mraa_spi_context spi;
