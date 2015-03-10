@@ -28,8 +28,7 @@
 
 int
 main (int argc, char ** argv) {
-    HardwareSPIClass* pipe = new HardwareSPIClass ();
-    RF22* rf22 = new RF22 (10, 0, pipe);
+    RF22* rf22 = new RF22 (10, 0);
     
     rf22->init ();
     

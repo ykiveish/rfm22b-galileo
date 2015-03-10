@@ -5,6 +5,9 @@
 
 #include <RF22.h>
 #include <mraa.h>
+#include <cstring>
+#include <cmath>
+#include <sys/time.h>
 
 // Interrupt vectors for the 2 Arduino interrupt pins
 // Each interrupt can be handled by a different instance of RF22, allowing you to have
@@ -54,7 +57,7 @@ static const RF22::ModemConfig MODEM_CONFIG_TABLE[] =
 
 };
 
-RF22::RF22(uint8_t slaveSelectPin, uint8_t interrupt, GenericSPIClass *spi)
+RF22::RF22(uint8_t slaveSelectPin, uint8_t interrupt)
 {
     _slaveSelectPin = slaveSelectPin;
     _interrupt = interrupt;
@@ -63,7 +66,6 @@ RF22::RF22(uint8_t slaveSelectPin, uint8_t interrupt, GenericSPIClass *spi)
     _rxGood = 0;
     _rxBad = 0;
     _txGood = 0;
-    _spi = spi;
 }
 
 
@@ -79,14 +81,20 @@ uint8_t RF22::init()
 
     // start the SPI library:
     // Note the RF22 wants mode 0, MSB first and default to 1 Mbps
-    _spi->begin();
+    /*_spi->begin();
     _spi->setDataMode(0x0);
     _spi->setBitOrder(0x0);
     _spi->setClockDivider(0x1);  // (16 Mhz / 16) = 1 MHz
+    usleep (100);*/
+    
+    _spi = mraa_spi_init(0);
+    mraa_spi_mode (_spi, MRAA_SPI_MODE0);
+    mraa_spi_lsbmode(_spi, 0);
+    mraa_spi_frequency(_spi, 1000000); // 1Mhz
     usleep (100);
 
     // Software reset the device
-    /*reset();
+    reset();
 
     // Get the device type and check it
     // This also tests whether we are really connected to a device
@@ -95,20 +103,26 @@ uint8_t RF22::init()
         && _deviceType != RF22_DEVICE_TYPE_TX)
 	return 0;
 
+    
+    
+    mraa_gpio_dir(_irq, MRAA_GPIO_IN);
+    gpio_edge_t edge = MRAA_GPIO_EDGE_FALLING;
 	// Set up interrupt handler
     if (_interrupt == 0)
     {
 	_RF22ForInterrupt[0] = this;
-	attachInterrupt(0, RF22::isr0, LOW);  
+    mraa_gpio_isr(_irq, edge, &RF22::isr0, NULL);
+	// attachInterrupt(0, RF22::isr0, LOW);  
     }
     else if (_interrupt == 1)
     {
 	_RF22ForInterrupt[1] = this;
-	attachInterrupt(1, RF22::isr1, LOW);  
+    mraa_gpio_isr(_irq, edge, &RF22::isr1, NULL);
+	// attachInterrupt(1, RF22::isr1, LOW);  
     }
     else
 	return 0;
- 
+
     clearTxBuf();
     clearRxBuf();
   
@@ -163,11 +177,11 @@ uint8_t RF22::init()
     // Minimum power
     setTxPower(RF22_TXPOW_8DBM);
 //    setTxPower(RF22_TXPOW_17DBM);
-*/
+
     return 1;
 }
 
-/*
+
 // C++ level interrupt handler for this instance
 void RF22::handleInterrupt()
 {
@@ -177,12 +191,12 @@ void RF22::handleInterrupt()
 
 #if 0
     // Caution: Serial printing in this interrupt routine can cause mysterious crashes
-    Serial.print("interrupt ");
+    /*Serial.print("interrupt ");
     Serial.print(_lastInterruptFlags[0], HEX);
     Serial.print(" ");
     Serial.println(_lastInterruptFlags[1], HEX);
     if (_lastInterruptFlags[0] == 0 && _lastInterruptFlags[1] == 0)
-	Serial.println("FUNNY: no interrupt!");
+	Serial.println("FUNNY: no interrupt!");*/
 #endif
 
 #if 0
@@ -285,70 +299,121 @@ void RF22::handleInterrupt()
 // These are low level functions that call the interrupt handler for the correct
 // instance of RF22.
 // 2 interrupts allows us to have 2 different devices
-void RF22::isr0()
+void RF22::isr0(void* args)
 {
     if (_RF22ForInterrupt[0])
 	_RF22ForInterrupt[0]->handleInterrupt();
 }
-void RF22::isr1()
+void RF22::isr1(void* args)
 {
     if (_RF22ForInterrupt[1])
 	_RF22ForInterrupt[1]->handleInterrupt();
 }
 
+
 void RF22::reset()
 {
     spiWrite(RF22_REG_07_OPERATING_MODE1, RF22_SWRES);
     // Wait for it to settle
-    delay(1); // SWReset time is nominally 100usec
+    usleep(1); // SWReset time is nominally 100usec
 }
 
 uint8_t RF22::spiRead(uint8_t reg)
 {
-    uint8_t val;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
-	digitalWrite(_slaveSelectPin, LOW);
-	_spi->transfer(reg & ~RF22_SPI_WRITE_MASK); // Send the address with the write mask off
-	val = _spi->transfer(0); // The written value is ignored, reg value is read
-	digitalWrite(_slaveSelectPin, HIGH);
-    }
-    return val;
+    uint8_t data;
+    spiBurstRead (reg, &data, 1);
+    return data;
+
+    // uint8_t val;
+    // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    //{
+	//digitalWrite(_slaveSelectPin, LOW);
+	//_spi->transfer(reg & ~RF22_SPI_WRITE_MASK); // Send the address with the write mask off
+	//val = _spi->transfer(0); // The written value is ignored, reg value is read
+	//digitalWrite(_slaveSelectPin, HIGH);
+    // }
+    //return val;
 }
 
 void RF22::spiWrite(uint8_t reg, uint8_t val)
 {
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
-	digitalWrite(_slaveSelectPin, LOW);
-	_spi->transfer(reg | RF22_SPI_WRITE_MASK); // Send the address with the write mask on
-	_spi->transfer(val); // New value follows
-	digitalWrite(_slaveSelectPin, HIGH);
-    }
+    spiBurstWrite (reg, &val, 1);
+    
+    // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    // {
+	//digitalWrite(_slaveSelectPin, LOW);
+	//_spi->transfer(reg | RF22_SPI_WRITE_MASK); // Send the address with the write mask on
+	//_spi->transfer(val); // New value follows
+	//digitalWrite(_slaveSelectPin, HIGH);
+    // }
 }
 
 void RF22::spiBurstRead(uint8_t reg, uint8_t* dest, uint8_t len)
 {
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
-	digitalWrite(_slaveSelectPin, LOW);
-	_spi->transfer(reg & ~RF22_SPI_WRITE_MASK); // Send the start address with the write mask off
+    uint8_t *request;
+    uint8_t *response;
+    
+    request =  (uint8_t *) malloc(sizeof(uint8_t) * (len + 1));
+    response = (uint8_t *) malloc(sizeof(uint8_t) * (len + 1));
+    memset(request,  0x00, len + 1);
+	memset(response, 0x00, len + 1);
+    
+    request[0] = reg & ~RF22_SPI_WRITE_MASK;
+    memcpy (&request[1], dest, len);
+    
+    mraa_gpio_write(_cs, 0x1);
+	mraa_gpio_write(_cs, 0x0);
+	usleep(100);
+	mraa_spi_transfer_buf(_spi, request, response, len + 1);
+	usleep(100);
+	mraa_gpio_write(_cs, 0x1);
+    
+    memcpy (dest, &response[1], len);
+    
+    free (request);
+    free (response);
+    
+    // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    // {
+	//digitalWrite(_slaveSelectPin, LOW);
+	/*_spi->transfer(reg & ~RF22_SPI_WRITE_MASK); // Send the start address with the write mask off
 	while (len--)
-	    *dest++ = _spi->transfer(0);
-	digitalWrite(_slaveSelectPin, HIGH);
-    }
+	    *dest++ = _spi->transfer(0);*/
+	//digitalWrite(_slaveSelectPin, HIGH);
+    // }
 }
 
 void RF22::spiBurstWrite(uint8_t reg, const uint8_t* src, uint8_t len)
 {
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
-	digitalWrite(_slaveSelectPin, LOW);
-	_spi->transfer(reg | RF22_SPI_WRITE_MASK); // Send the start address with the write mask on
+    uint8_t *request;
+    uint8_t *response;
+    
+    request =  (uint8_t *) malloc(sizeof(uint8_t) * (len + 1));
+    response = (uint8_t *) malloc(sizeof(uint8_t) * (len + 1));
+    memset(request,  0x00, len + 1);
+	memset(response, 0x00, len + 1);
+    
+    request[0] = reg & ~RF22_SPI_WRITE_MASK;
+    memcpy (&request[1], src, len);
+    
+    mraa_gpio_write(_cs, 0x1);
+	mraa_gpio_write(_cs, 0x0);
+	usleep(100);
+	mraa_spi_transfer_buf(_spi, request, response, len + 1);
+	usleep(100);
+	mraa_gpio_write(_cs, 0x1);
+    
+    free (request);
+    free (response);
+    
+    // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    // {
+	//digitalWrite(_slaveSelectPin, LOW);
+	/*_spi->transfer(reg | RF22_SPI_WRITE_MASK); // Send the start address with the write mask on
 	while (len--)
-	    _spi->transfer(*src++);
-	digitalWrite(_slaveSelectPin, HIGH);
-    }
+	    _spi->transfer(*src++);*/
+	//digitalWrite(_slaveSelectPin, HIGH);
+    //}
 }
 
 uint8_t RF22::statusRead()
@@ -401,7 +466,7 @@ void RF22::setWutPeriod(uint16_t wtm, uint8_t wtr, uint8_t wtd)
 // Returns true if centre + (fhch * fhs) is within limits
 // Caution, different versions of the RF22 support different max freq
 // so YMMV
-boolean RF22::setFrequency(float centre, float afcPullInRange)
+uint8_t RF22::setFrequency(float centre, float afcPullInRange)
 {
     uint8_t fbsel = RF22_SBSEL;
     uint8_t afclimiter;
@@ -439,7 +504,7 @@ boolean RF22::setFrequency(float centre, float afcPullInRange)
 
 // Step size in 10kHz increments
 // Returns true if centre + (fhch * fhs) is within limits
-boolean RF22::setFHStepSize(uint8_t fhs)
+uint8_t RF22::setFHStepSize(uint8_t fhs)
 {
     spiWrite(RF22_REG_7A_FREQUENCY_HOPPING_STEP_SIZE, fhs);
     return !(statusRead() & RF22_FREQERR);
@@ -447,7 +512,7 @@ boolean RF22::setFHStepSize(uint8_t fhs)
 
 // Adds fhch * fhs to centre frequency
 // Returns true if centre + (fhch * fhs) is within limits
-boolean RF22::setFHChannel(uint8_t fhch)
+uint8_t RF22::setFHChannel(uint8_t fhch)
 {
     spiWrite(RF22_REG_79_FREQUENCY_HOPPING_CHANNEL_SELECT, fhch);
     return !(statusRead() & RF22_FREQERR);
@@ -524,13 +589,14 @@ void RF22::setModemRegisters(const ModemConfig* config)
 
 // Set one of the canned FSK Modem configs
 // Returns true if its a valid choice
-boolean RF22::setModemConfig(ModemConfigChoice index)
+uint8_t RF22::setModemConfig(ModemConfigChoice index)
 {
     if (index > (sizeof(MODEM_CONFIG_TABLE) / sizeof(ModemConfig)))
         return false;
 
     RF22::ModemConfig cfg;
-    memcpy_P(&cfg, &MODEM_CONFIG_TABLE[index], sizeof(RF22::ModemConfig));
+    // memcpy_P(&cfg, &MODEM_CONFIG_TABLE[index], sizeof(RF22::ModemConfig)); // !!!!!!!!!!!!!!!!!!! MIGHT CAUSE ISSUES
+    memcpy(&cfg, &MODEM_CONFIG_TABLE[index], sizeof(RF22::ModemConfig));
     setModemRegisters(&cfg);
 
     return true;
@@ -550,14 +616,14 @@ void RF22::setSyncWords(const uint8_t* syncWords, uint8_t len)
 
 void RF22::clearRxBuf()
 {
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
+    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    //{
 	_bufLen = 0;
 	_rxBufValid = false;
-    }
+    //}
 }
 
-boolean RF22::available()
+uint8_t RF22::available()
 {
     if (!_rxBufValid)
 	setModeRx(); // Make sure we are receiving
@@ -575,8 +641,13 @@ void RF22::waitAvailable()
 // Return true if there is a message available
 bool RF22::waitAvailableTimeout(uint16_t timeout)
 {
-    unsigned long endtime = millis() + timeout;
+    /*unsigned long endtime = millis() + timeout;
     while (millis() < endtime)
+	if (available())
+	    return true;
+    return false;*/
+    unsigned long endtime = getTimestamp() + timeout;
+    while (getTimestamp() < endtime)
 	if (available())
 	    return true;
     return false;
@@ -594,7 +665,7 @@ void RF22::printBuffer(const char* prompt, const uint8_t* buf, uint8_t len)
 #ifdef RF22_HAVE_SERIAL
     uint8_t i;
 
-    Serial.println(prompt);
+    /*Serial.println(prompt);
     for (i = 0; i < len; i++)
     {
 	if (i % 16 == 15)
@@ -605,32 +676,32 @@ void RF22::printBuffer(const char* prompt, const uint8_t* buf, uint8_t len)
 	    Serial.print(' ');
 	}
     }
-    Serial.println(' ');
+    Serial.println(' ');*/
 #endif
 }
 
-boolean RF22::recv(uint8_t* buf, uint8_t* len)
+uint8_t RF22::recv(uint8_t* buf, uint8_t* len)
 {
     if (!available())
 	return false;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
+    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    //{
 	if (*len > _bufLen)
 	    *len = _bufLen;
 	memcpy(buf, _buf, *len);
 	clearRxBuf();
 //    printBuffer("recv:", buf, *len);
-    }
+    //}
     return true;
 }
 
 void RF22::clearTxBuf()
 {
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
+    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    //{
 	_bufLen = 0;
 	_txBufSentIndex = 0;
-    }
+    //}
 }
 
 void RF22::startTransmit()
@@ -649,20 +720,20 @@ void RF22::restartTransmit()
     startTransmit();
 }
 
-boolean RF22::send(const uint8_t* data, uint8_t len)
+uint8_t RF22::send(const uint8_t* data, uint8_t len)
 {
     waitPacketSent();
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
+    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    //{
 	if (!fillTxBuf(data, len))
 	    return false;
 	startTransmit();
-    }
+    //}
 //    printBuffer("send:", data, len);
     return true;
 }
 
-boolean RF22::fillTxBuf(const uint8_t* data, uint8_t len)
+uint8_t RF22::fillTxBuf(const uint8_t* data, uint8_t len)
 {
     clearTxBuf();
     if (!len)
@@ -670,15 +741,15 @@ boolean RF22::fillTxBuf(const uint8_t* data, uint8_t len)
     return appendTxBuf(data, len);
 }
 
-boolean RF22::appendTxBuf(const uint8_t* data, uint8_t len)
+uint8_t RF22::appendTxBuf(const uint8_t* data, uint8_t len)
 {
     if (((uint16_t)_bufLen + len) > RF22_MAX_MESSAGE_LEN)
 	return false;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    {
+    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    //{
 	memcpy(_buf + _bufLen, data, len);
 	_bufLen += len;
-    }
+   // }
 //    printBuffer("txbuf:", _buf, _bufLen);
     return true;
 }
@@ -786,8 +857,14 @@ uint8_t RF22::lastRssi()
     return _lastRssi;
 }
 
-void RF22::setPromiscuous(boolean promiscuous)
+void RF22::setPromiscuous(uint8_t promiscuous)
 {
     spiWrite(RF22_REG_43_HEADER_ENABLE3, promiscuous ? 0x00 : 0xff);
 }
-*/
+
+uint64_t 
+RF22::getTimestamp () {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (uint64_t)(1000000 * tv.tv_sec + tv.tv_usec);
+}

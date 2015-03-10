@@ -369,8 +369,9 @@
 // Define this to include Serial printing in diagnostic routines
 #define RF22_HAVE_SERIAL
 
-#include <GenericSPI.h>
-#include <HardwareSPI.h>
+#include <stdint.h>
+#include <mraa.h>
+
 /////////////////////////////////////////////////////////////////////
 /// \class RF22 RF22.h <RF22.h>
 /// \brief Send and receive unaddressed, unreliable datagrams.
@@ -469,7 +470,7 @@ public:
     /// \param[in] interrupt The interrupt number to use. Default is interrupt 0 (Arduino input pin 2)
     /// \param[in] spi Pointer to the SPI interface object to use. 
     ///                Defaults to the standard Arduino hardware SPI interface
-    RF22(uint8_t slaveSelectPin, uint8_t interrupt, GenericSPIClass *spi);
+    RF22(uint8_t slaveSelectPin, uint8_t interrupt);
 
     /// Initialises this instance and the radio module connected to it.
     /// The following steps are taken:
@@ -482,7 +483,7 @@ public:
     /// - Sets the modem data rate to FSK_Rb2_4Fd36
     /// \return  true if everything was successful
     uint8_t        init();
-/*
+
     /// Issues a software reset to the 
     /// RF22 module. Blocks for 1ms to ensure the reset is complete.
     void           reset();
@@ -551,17 +552,17 @@ public:
     /// \param[in] afcPullInRange Sets the AF Pull In Range in MHz. Defaults to 0.05MHz (50kHz). Range is 0.0 to 0.159375
     /// for frequencies 240.0 to 480MHz, and 0.0 to 0.318750MHz for  frequencies 480.0 to 960MHz, 
     /// \return true if the selected frquency centre + (fhch * fhs) is within range and the afcPullInRange is within range
-    boolean        setFrequency(float centre, float afcPullInRange = 0.05);
+    uint8_t        setFrequency(float centre, float afcPullInRange = 0.05);
 
     /// Sets the frequency hopping step size.
     /// \param[in] fhs Frequency Hopping step size in 10kHz increments
     /// \return true if centre + (fhch * fhs) is within limits
-    boolean        setFHStepSize(uint8_t fhs);
+    uint8_t        setFHStepSize(uint8_t fhs);
 
     /// Sets the frequncy hopping channel. Adds fhch * fhs to centre frequency
     /// \param[in] fhch The channel number
     /// \return true if the selected frquency centre + (fhch * fhs) is within range
-    boolean        setFHChannel(uint8_t fhch);
+    uint8_t        setFHChannel(uint8_t fhch);
 
     /// Reads and returns the current RSSI value from register RF22_REG_26_RSSI. If you want to find the RSSI
     /// of the last received message, use lastRssi() instead.
@@ -613,13 +614,13 @@ public:
     /// here, use setModemRegisters() with your own ModemConfig.
     /// \param[in] index The configuration choice.
     /// \return true if index is a valid choice.
-    boolean        setModemConfig(ModemConfigChoice index);
+    uint8_t        setModemConfig(ModemConfigChoice index);
 
     /// Starts the receiver and checks whether a received message is available.
     /// This can be called multiple times in a timeout loop
     /// \return true if a complete, valid message has been received and is able to be retrieved by
     /// recv()
-    boolean        available();
+    uint8_t        available();
 
     /// Starts the receiver and blocks until a valid received 
     /// message is available.
@@ -639,7 +640,7 @@ public:
     /// \param[in] buf Location to copy the received message
     /// \param[in,out] len Pointer to available space in buf. Set to the actual number of octets copied.
     /// \return true if a valid message was copied to buf
-    boolean        recv(uint8_t* buf, uint8_t* len);
+    uint8_t        recv(uint8_t* buf, uint8_t* len);
 
     /// Waits until any previous transmit packet is finished being transmitted with waitPacketSent().
     /// Then loads a message into the transmitter and starts the transmitter. Note that a message length
@@ -647,7 +648,7 @@ public:
     /// \param[in] data Array of data to be sent
     /// \param[in] len Number of bytes of data to send (> 0)
     /// \return true if the message length was valid and it was correctly queued for transmit
-    boolean        send(const uint8_t* data, uint8_t len);
+    uint8_t        send(const uint8_t* data, uint8_t len);
 
     /// Blocks until the RF22 is not in mode RF22_MODE_TX (ie until the RF22 is not transmitting).
     /// This effectively waits until any previous transmit packet is finished being transmitted.
@@ -656,7 +657,7 @@ public:
     /// Tells the receiver to accept messages with any TO address, not just messages
     /// addressed to this node or the broadcast address
     /// \param[in] promiscuous true if you wish to receive messages with any TO address
-    void           setPromiscuous(boolean promiscuous);
+    void           setPromiscuous(uint8_t promiscuous);
 
     /// Returns the TO header of the last received message
     /// \return The TO header
@@ -721,13 +722,13 @@ protected:
     /// \param[in] data Array of data bytes to be sent (1 to 255)
     /// \param[in] len Number of data bytes in data (> 0)
     /// \return true if the message length is valid
-    boolean           fillTxBuf(const uint8_t* data, uint8_t len);
+    uint8_t           fillTxBuf(const uint8_t* data, uint8_t len);
 
     /// Appends the transmitter buffer with the data of a mesage to be sent
     /// \param[in] data Array of data bytes to be sent (0 to 255)
     /// \param[in] len Number of data bytes in data
     /// \return false if the resulting message would exceed RF22_MAX_MESSAGE_LEN, else true
-    boolean           appendTxBuf(const uint8_t* data, uint8_t len);
+    uint8_t           appendTxBuf(const uint8_t* data, uint8_t len);
 
     /// Internal function to load the next fragment of 
     /// the current message into the transmitter FIFO
@@ -785,16 +786,19 @@ protected:
     /// ReStart the transmission of the contents 
     /// of the Tx buffer after a atransmission failure
     void           restartTransmit();
-*/
+    
+    uint64_t       getTimestamp ();
+
 protected:
-    GenericSPIClass*    _spi;
+    mraa_spi_context    _spi;
     mraa_gpio_context   _cs;
+    mraa_gpio_context   _irq;
 
     /// Low level interrupt service routine for RF22 connected to interrupt 0
-    static void         isr0();
+    static void         isr0(void* args);
 
     /// Low level interrupt service routine for RF22 connected to interrupt 1
-    static void         isr1();
+    static void         isr1(void* args);
 
     /// Array of instances connected to interrupts 0 and 1
     static RF22*        _RF22ForInterrupt[];
