@@ -9,5 +9,8 @@ include_directories (
 
 add_subdirectory (src)
 
-add_executable (rfm22-test rfm22-test.cpp)
-target_link_libraries (rfm22-test rfm22)
+add_executable (rfm22-client rfm22-client.cpp)
+target_link_libraries (rfm22-client rfm22)
+
+add_executable (rfm22-server rfm22-server.cpp)
+target_link_libraries (rfm22-server rfm22)
