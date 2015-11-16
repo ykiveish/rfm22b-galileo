@@ -39,12 +39,12 @@ sig_handler (int signo) {
 int
 main (int argc, char ** argv) {
     RF22* rf22 = new RF22 (10, 0);
-    
+
     if (!rf22->init()) {
         std::cout << "RF22 init failed" << std::endl;
         return 0x1;
     }
-    
+
     uint8_t data[] = "Hello World!";
     uint8_t buf[RF22_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
@@ -69,7 +69,7 @@ main (int argc, char ** argv) {
             std::cout << "No reply, is rf22_server running?" << std::endl;
         }
     }
-    
+
 	std::cout << "Exit 'rfm22-client'" << std::endl;
 	return 0;
 }

@@ -27,12 +27,13 @@
 #include "RF22.h"
 #include "mraa.h"
 
-bool amWorking = true;
+uint8_t amWorking = 0x1;
 
 void
 sig_handler (int signo) {
 	if (signo == SIGINT) {
-		amWorking = false;
+		std::cout << "SIGNAL [SIGINT]" << std::endl;
+		amWorking = 0x0;
 	}
 }
 
@@ -49,8 +50,9 @@ main (int argc, char ** argv) {
     uint8_t len = sizeof(buf);
     
     signal (SIGINT, sig_handler);
-    while (amWorking) {
-        rf22->waitAvailable();
+    while (amWorking == 0x1) {
+        // rf22->waitAvailable();
+        rf22->waitAvailableTimeout (500);
 
         // Should be a message for us now   
         if (rf22->recv(buf, &len)) {
@@ -60,13 +62,12 @@ main (int argc, char ** argv) {
             uint8_t data[] = "And hello back to you";
             rf22->send(data, sizeof(data));
             rf22->waitPacketSent();
-            
-            std::cout << "Sent a reply" << std::endl;
         } else {
-            std::cout << "recv failed" << std::endl;
+            // Do whatever you need.
         }
     }
-    
+
+    delete rf22;
 	std::cout << "Exit 'rfm22-server'" << std::endl;
 	return 0;
 }

@@ -103,21 +103,21 @@ uint8_t RF22::init()
         && _deviceType != RF22_DEVICE_TYPE_TX)
 	return 0;
 
-    
-    
+ 
+    _irq = mraa_gpio_init(_interrupt + 2);
     mraa_gpio_dir(_irq, MRAA_GPIO_IN);
     gpio_edge_t edge = MRAA_GPIO_EDGE_FALLING;
 	// Set up interrupt handler
     if (_interrupt == 0)
     {
 	_RF22ForInterrupt[0] = this;
-    mraa_gpio_isr(_irq, edge, &RF22::isr0, NULL);
+    	mraa_gpio_isr(_irq, edge, &RF22::isr0, NULL);
 	// attachInterrupt(0, RF22::isr0, LOW);  
     }
     else if (_interrupt == 1)
     {
 	_RF22ForInterrupt[1] = this;
-    mraa_gpio_isr(_irq, edge, &RF22::isr1, NULL);
+    	mraa_gpio_isr(_irq, edge, &RF22::isr1, NULL);
 	// attachInterrupt(1, RF22::isr1, LOW);  
     }
     else
@@ -315,7 +315,7 @@ void RF22::reset()
 {
     spiWrite(RF22_REG_07_OPERATING_MODE1, RF22_SWRES);
     // Wait for it to settle
-    usleep(1); // SWReset time is nominally 100usec
+    usleep(100); // SWReset time is nominally 100usec
 }
 
 uint8_t RF22::spiRead(uint8_t reg)
@@ -393,7 +393,7 @@ void RF22::spiBurstWrite(uint8_t reg, const uint8_t* src, uint8_t len)
     memset(request,  0x00, len + 1);
 	memset(response, 0x00, len + 1);
     
-    request[0] = reg & ~RF22_SPI_WRITE_MASK;
+    request[0] = reg | RF22_SPI_WRITE_MASK;
     memcpy (&request[1], src, len);
     
     mraa_gpio_write(_cs, 0x1);
