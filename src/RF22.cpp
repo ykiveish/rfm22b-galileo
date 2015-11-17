@@ -1,7 +1,26 @@
-// RF22.cpp
-//
-// Copyright (C) 2011 Mike McCauley
-// $Id: RF22.cpp,v 1.17 2013/02/06 21:33:56 mikem Exp mikem $
+/*
+* Author: Kiveisha Yevgeniy
+* Copyright (C) 2011 Mike McCauley
+*
+* Permission is hereby granted, free of charge, to any person obtaining
+* a copy of this software and associated documentation files (the
+* "Software"), to deal in the Software without restriction, including
+* without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to
+* permit persons to whom the Software is furnished to do so, subject to
+* the following conditions:
+*
+* The above copyright notice and this permission notice shall be
+* included in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+* LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+* OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+* WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #include <RF22.h>
 #include <mraa.h>
@@ -81,12 +100,6 @@ uint8_t RF22::init()
 
     // start the SPI library:
     // Note the RF22 wants mode 0, MSB first and default to 1 Mbps
-    /*_spi->begin();
-    _spi->setDataMode(0x0);
-    _spi->setBitOrder(0x0);
-    _spi->setClockDivider(0x1);  // (16 Mhz / 16) = 1 MHz
-    usleep (100);*/
-    
     _spi = mraa_spi_init(0);
     mraa_spi_mode (_spi, MRAA_SPI_MODE0);
     mraa_spi_lsbmode(_spi, 0);
@@ -102,7 +115,6 @@ uint8_t RF22::init()
     if (   _deviceType != RF22_DEVICE_TYPE_RX_TRX
         && _deviceType != RF22_DEVICE_TYPE_TX)
 	return 0;
-
  
     _irq = mraa_gpio_init(_interrupt + 2);
     mraa_gpio_dir(_irq, MRAA_GPIO_IN);
@@ -110,15 +122,13 @@ uint8_t RF22::init()
 	// Set up interrupt handler
     if (_interrupt == 0)
     {
-	_RF22ForInterrupt[0] = this;
+		_RF22ForInterrupt[0] = this;
     	mraa_gpio_isr(_irq, edge, &RF22::isr0, NULL);
-	// attachInterrupt(0, RF22::isr0, LOW);  
     }
     else if (_interrupt == 1)
     {
-	_RF22ForInterrupt[1] = this;
+		_RF22ForInterrupt[1] = this;
     	mraa_gpio_isr(_irq, edge, &RF22::isr1, NULL);
-	// attachInterrupt(1, RF22::isr1, LOW);  
     }
     else
 	return 0;
@@ -181,7 +191,6 @@ uint8_t RF22::init()
     return 1;
 }
 
-
 // C++ level interrupt handler for this instance
 void RF22::handleInterrupt()
 {
@@ -189,110 +198,79 @@ void RF22::handleInterrupt()
     // Read the interrupt flags which clears the interrupt
     spiBurstRead(RF22_REG_03_INTERRUPT_STATUS1, _lastInterruptFlags, 2);
 
-#if 0
-    // Caution: Serial printing in this interrupt routine can cause mysterious crashes
-    /*Serial.print("interrupt ");
-    Serial.print(_lastInterruptFlags[0], HEX);
-    Serial.print(" ");
-    Serial.println(_lastInterruptFlags[1], HEX);
-    if (_lastInterruptFlags[0] == 0 && _lastInterruptFlags[1] == 0)
-	Serial.println("FUNNY: no interrupt!");*/
-#endif
-
-#if 0
-    // TESTING: fake an RF22_IFFERROR
-    static int counter = 0;
-    if (_lastInterruptFlags[0] & RF22_IPKSENT && counter++ == 10)
-    {
-	_lastInterruptFlags[0] = RF22_IFFERROR;
-	counter = 0;
-    }
-#endif
-
     if (_lastInterruptFlags[0] & RF22_IFFERROR)
-    {
-//	Serial.println("IFFERROR");  
-	resetFifos(); // Clears the interrupt
-	if (_mode == RF22_MODE_TX)
-	    restartTransmit();
-	else if (_mode == RF22_MODE_RX)
-	    clearRxBuf();
+    { 
+		resetFifos(); // Clears the interrupt
+		if (_mode == RF22_MODE_TX)
+			restartTransmit();
+		else if (_mode == RF22_MODE_RX)
+			clearRxBuf();
     }
     // Caution, any delay here may cause a FF underflow or overflow
     if (_lastInterruptFlags[0] & RF22_ITXFFAEM)
     {
-	// See if more data has to be loaded into the Tx FIFO 
-	sendNextFragment();
-//	Serial.println("ITXFFAEM");  
+		// See if more data has to be loaded into the Tx FIFO 
+		sendNextFragment();
     }
     if (_lastInterruptFlags[0] & RF22_IRXFFAFULL)
     {
-	// Caution, any delay here may cause a FF overflow
-	// Read some data from the Rx FIFO
-	readNextFragment();
-//	Serial.println("IRXFFAFULL"); 
+		// Caution, any delay here may cause a FF overflow
+		// Read some data from the Rx FIFO
+		readNextFragment(); 
     }
     if (_lastInterruptFlags[0] & RF22_IEXT)
     {
-	// This is not enabled by the base code, but users may want to enable it
-	handleExternalInterrupt();
-//	Serial.println("IEXT"); 
+		// This is not enabled by the base code, but users may want to enable it
+		handleExternalInterrupt();
     }
     if (_lastInterruptFlags[1] & RF22_IWUT)
     {
-	// This is not enabled by the base code, but users may want to enable it
-	handleWakeupTimerInterrupt();
-//	Serial.println("IWUT"); 
+		// This is not enabled by the base code, but users may want to enable it
+		handleWakeupTimerInterrupt();
     }
     if (_lastInterruptFlags[0] & RF22_IPKSENT)
     {
-//	Serial.println("IPKSENT");   
-	_txGood++; 
-	// Transmission does not automatically clear the tx buffer.
-	// Could retransmit if we wanted
-	// RF22 transitions automatically to Idle
-	_mode = RF22_MODE_IDLE;
+		_txGood++; 
+		// Transmission does not automatically clear the tx buffer.
+		// Could retransmit if we wanted
+		// RF22 transitions automatically to Idle
+		_mode = RF22_MODE_IDLE;
     }
     if (_lastInterruptFlags[0] & RF22_IPKVALID)
     {
-	uint8_t len = spiRead(RF22_REG_4B_RECEIVED_PACKET_LENGTH);
-//	Serial.println("IPKVALID");   
-//	Serial.println(len);   
-//	Serial.println(_bufLen);   
+		uint8_t len = spiRead(RF22_REG_4B_RECEIVED_PACKET_LENGTH);
 
-	// May have already read one or more fragments
-	// Get any remaining unread octets, based on the expected length
-	// First make sure we dont overflow the buffer in the case of a stupid length
-	// or partial bad receives
-	if (   len >  RF22_MAX_MESSAGE_LEN
-	    || len < _bufLen)
-	{
-	    _rxBad++;
-	    _mode = RF22_MODE_IDLE;
-	    clearRxBuf();
-	    return; // Hmmm receiver buffer overflow. 
-	}
+		// May have already read one or more fragments
+		// Get any remaining unread octets, based on the expected length
+		// First make sure we dont overflow the buffer in the case of a stupid length
+		// or partial bad receives
+		if (   len >  RF22_MAX_MESSAGE_LEN
+			|| len < _bufLen)
+		{
+			_rxBad++;
+			_mode = RF22_MODE_IDLE;
+			clearRxBuf();
+			return; // Hmmm receiver buffer overflow. 
+		}
 
-	spiBurstRead(RF22_REG_7F_FIFO_ACCESS, _buf + _bufLen, len - _bufLen);
-	_rxGood++;
-	_bufLen = len;
-	_mode = RF22_MODE_IDLE;
-	_rxBufValid = true;
+		spiBurstRead(RF22_REG_7F_FIFO_ACCESS, _buf + _bufLen, len - _bufLen);
+		_rxGood++;
+		_bufLen = len;
+		_mode = RF22_MODE_IDLE;
+		_rxBufValid = true;
     }
     if (_lastInterruptFlags[0] & RF22_ICRCERROR)
     {
-//	Serial.println("ICRCERR");  
-	_rxBad++;
-	clearRxBuf();
-	resetRxFifo();
-	_mode = RF22_MODE_IDLE;
-	setModeRx(); // Keep trying
+		_rxBad++;
+		clearRxBuf();
+		resetRxFifo();
+		_mode = RF22_MODE_IDLE;
+		setModeRx(); // Keep trying
     }
     if (_lastInterruptFlags[1] & RF22_IPREAVAL)
     {
-//	Serial.println("IPREAVAL");  
-	_lastRssi = spiRead(RF22_REG_26_RSSI);
-	clearRxBuf();
+		_lastRssi = spiRead(RF22_REG_26_RSSI);
+		clearRxBuf();
     }
 }
 
@@ -304,12 +282,12 @@ void RF22::isr0(void* args)
     if (_RF22ForInterrupt[0])
 	_RF22ForInterrupt[0]->handleInterrupt();
 }
+
 void RF22::isr1(void* args)
 {
     if (_RF22ForInterrupt[1])
 	_RF22ForInterrupt[1]->handleInterrupt();
 }
-
 
 void RF22::reset()
 {
@@ -323,29 +301,11 @@ uint8_t RF22::spiRead(uint8_t reg)
     uint8_t data;
     spiBurstRead (reg, &data, 1);
     return data;
-
-    // uint8_t val;
-    // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    //{
-	//digitalWrite(_slaveSelectPin, LOW);
-	//_spi->transfer(reg & ~RF22_SPI_WRITE_MASK); // Send the address with the write mask off
-	//val = _spi->transfer(0); // The written value is ignored, reg value is read
-	//digitalWrite(_slaveSelectPin, HIGH);
-    // }
-    //return val;
 }
 
 void RF22::spiWrite(uint8_t reg, uint8_t val)
 {
     spiBurstWrite (reg, &val, 1);
-    
-    // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    // {
-	//digitalWrite(_slaveSelectPin, LOW);
-	//_spi->transfer(reg | RF22_SPI_WRITE_MASK); // Send the address with the write mask on
-	//_spi->transfer(val); // New value follows
-	//digitalWrite(_slaveSelectPin, HIGH);
-    // }
 }
 
 void RF22::spiBurstRead(uint8_t reg, uint8_t* dest, uint8_t len)
@@ -372,15 +332,6 @@ void RF22::spiBurstRead(uint8_t reg, uint8_t* dest, uint8_t len)
     
     free (request);
     free (response);
-    
-    // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    // {
-	//digitalWrite(_slaveSelectPin, LOW);
-	/*_spi->transfer(reg & ~RF22_SPI_WRITE_MASK); // Send the start address with the write mask off
-	while (len--)
-	    *dest++ = _spi->transfer(0);*/
-	//digitalWrite(_slaveSelectPin, HIGH);
-    // }
 }
 
 void RF22::spiBurstWrite(uint8_t reg, const uint8_t* src, uint8_t len)
@@ -405,15 +356,6 @@ void RF22::spiBurstWrite(uint8_t reg, const uint8_t* src, uint8_t len)
     
     free (request);
     free (response);
-    
-    // ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    // {
-	//digitalWrite(_slaveSelectPin, LOW);
-	/*_spi->transfer(reg | RF22_SPI_WRITE_MASK); // Send the start address with the write mask on
-	while (len--)
-	    _spi->transfer(*src++);*/
-	//digitalWrite(_slaveSelectPin, HIGH);
-    //}
 }
 
 uint8_t RF22::statusRead()
@@ -474,17 +416,17 @@ uint8_t RF22::setFrequency(float centre, float afcPullInRange)
 	return false;
     if (centre >= 480.0)
     {
-	if (afcPullInRange < 0.0 || afcPullInRange > 0.318750)
-	    return false;
-	centre /= 2;
-	fbsel |= RF22_HBSEL;
-	afclimiter = afcPullInRange * 1000000.0 / 1250.0;
+		if (afcPullInRange < 0.0 || afcPullInRange > 0.318750)
+			return false;
+		centre /= 2;
+		fbsel |= RF22_HBSEL;
+		afclimiter = afcPullInRange * 1000000.0 / 1250.0;
     }
     else
     {
-	if (afcPullInRange < 0.0 || afcPullInRange > 0.159375)
-	    return false;
-	afclimiter = afcPullInRange * 1000000.0 / 625.0;
+		if (afcPullInRange < 0.0 || afcPullInRange > 0.159375)
+			return false;
+		afclimiter = afcPullInRange * 1000000.0 / 625.0;
     }
     centre /= 10.0;
     float integerPart = floor(centre);
@@ -537,8 +479,8 @@ void RF22::setModeIdle()
 {
     if (_mode != RF22_MODE_IDLE)
     {
-	setMode(_idleMode);
-	_mode = RF22_MODE_IDLE;
+		setMode(_idleMode);
+		_mode = RF22_MODE_IDLE;
     }
 }
 
@@ -546,8 +488,8 @@ void RF22::setModeRx()
 {
     if (_mode != RF22_MODE_RX)
     {
-	setMode(_idleMode | RF22_RXON);
-	_mode = RF22_MODE_RX;
+		setMode(_idleMode | RF22_RXON);
+		_mode = RF22_MODE_RX;
     }
 }
 
@@ -555,13 +497,13 @@ void RF22::setModeTx()
 {
     if (_mode != RF22_MODE_TX)
     {
-	setMode(_idleMode | RF22_TXON);
-	_mode = RF22_MODE_TX;
-	// Hmmm, if you dont clear the RX FIFO here, then it appears that going
-	// to transmit mode in the middle of a receive can corrupt the
-	// RX FIFO
-	resetRxFifo();
-	clearRxBuf();
+		setMode(_idleMode | RF22_TXON);
+		_mode = RF22_MODE_TX;
+		// Hmmm, if you dont clear the RX FIFO here, then it appears that going
+		// to transmit mode in the middle of a receive can corrupt the
+		// RX FIFO
+		resetRxFifo();
+		clearRxBuf();
     }
 }
 
@@ -616,11 +558,8 @@ void RF22::setSyncWords(const uint8_t* syncWords, uint8_t len)
 
 void RF22::clearRxBuf()
 {
-    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    //{
 	_bufLen = 0;
 	_rxBufValid = false;
-    //}
 }
 
 uint8_t RF22::available()
@@ -639,17 +578,17 @@ void RF22::waitAvailable()
 
 // Blocks until a valid message is received or timeout expires
 // Return true if there is a message available
-bool RF22::waitAvailableTimeout(uint16_t timeout)
+bool RF22::waitAvailableTimeout(unsigned long timeout)
 {
-    /*unsigned long endtime = millis() + timeout;
-    while (millis() < endtime)
-	if (available())
-	    return true;
-    return false;*/
     unsigned long endtime = getTimestamp() + timeout;
-    while (getTimestamp() < endtime)
-	if (available())
-	    return true;
+	unsigned long currenttime = getTimestamp();
+    while (currenttime < endtime) {
+		currenttime = getTimestamp();
+		if (available()) {
+			return true;
+		}
+	}
+		
     return false;
 }
 
@@ -662,46 +601,24 @@ void RF22::waitPacketSent()
 // Diagnostic help
 void RF22::printBuffer(const char* prompt, const uint8_t* buf, uint8_t len)
 {
-#ifdef RF22_HAVE_SERIAL
-    uint8_t i;
-
-    /*Serial.println(prompt);
-    for (i = 0; i < len; i++)
-    {
-	if (i % 16 == 15)
-	    Serial.println(buf[i], HEX);
-	else
-	{
-	    Serial.print(buf[i], HEX);
-	    Serial.print(' ');
-	}
-    }
-    Serial.println(' ');*/
-#endif
 }
 
 uint8_t RF22::recv(uint8_t* buf, uint8_t* len)
 {
     if (!available())
-	return false;
-    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    //{
+		return false;
+
 	if (*len > _bufLen)
 	    *len = _bufLen;
 	memcpy(buf, _buf, *len);
 	clearRxBuf();
-//    printBuffer("recv:", buf, *len);
-    //}
     return true;
 }
 
 void RF22::clearTxBuf()
 {
-    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    //{
 	_bufLen = 0;
 	_txBufSentIndex = 0;
-    //}
 }
 
 void RF22::startTransmit()
@@ -716,20 +633,17 @@ void RF22::restartTransmit()
 {
     _mode = RF22_MODE_IDLE;
     _txBufSentIndex = 0;
-//	    Serial.println("Restart");
     startTransmit();
 }
 
 uint8_t RF22::send(const uint8_t* data, uint8_t len)
 {
     waitPacketSent();
-    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    //{
+
 	if (!fillTxBuf(data, len))
 	    return false;
 	startTransmit();
-    //}
-//    printBuffer("send:", data, len);
+
     return true;
 }
 
@@ -745,12 +659,10 @@ uint8_t RF22::appendTxBuf(const uint8_t* data, uint8_t len)
 {
     if (((uint16_t)_bufLen + len) > RF22_MAX_MESSAGE_LEN)
 	return false;
-    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-    //{
+
 	memcpy(_buf + _bufLen, data, len);
 	_bufLen += len;
-   // }
-//    printBuffer("txbuf:", _buf, _bufLen);
+
     return true;
 }
 

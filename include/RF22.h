@@ -1,9 +1,29 @@
+/*
+* Author: Kiveisha Yevgeniy
+* Copyright (C) 2011 Mike McCauley.
+*
+* Permission is hereby granted, free of charge, to any person obtaining
+* a copy of this software and associated documentation files (the
+* "Software"), to deal in the Software without restriction, including
+* without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to
+* permit persons to whom the Software is furnished to do so, subject to
+* the following conditions:
+*
+* The above copyright notice and this permission notice shall be
+* included in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+* LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+* OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+* WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
 #ifndef RF22_h
 #define RF22_h
-
-// These defs cause trouble on some versions of Arduino
-#undef round
-#undef double
 
 // This is the bit in the SPI address that marks it as a write
 #define RF22_SPI_WRITE_MASK 0x80
@@ -629,7 +649,7 @@ public:
     /// Starts the receiver and blocks until a received message is available or a timeout
     /// \param[in] timeout Maximum time to wait in milliseconds.
     /// \return true if a message is available
-    bool           waitAvailableTimeout(uint16_t timeout);
+    bool           waitAvailableTimeout(unsigned long timeout);
 
     /// Turns the receiver on if it not already on.
     /// If there is a valid message available, copy it to buf and return true
@@ -686,7 +706,7 @@ public:
     /// \param[in] prompt string to preface the print
     /// \param[in] buf Location of the buffer to print
     /// \param[in] len Length of the buffer in octets.
-    static void           printBuffer(const char* prompt, const uint8_t* buf, uint8_t len);
+    static void		printBuffer(const char* prompt, const uint8_t* buf, uint8_t len);
 
     /// Sets the length of the preamble
     /// in 4-bit nibbles. 
@@ -722,13 +742,13 @@ protected:
     /// \param[in] data Array of data bytes to be sent (1 to 255)
     /// \param[in] len Number of data bytes in data (> 0)
     /// \return true if the message length is valid
-    uint8_t           fillTxBuf(const uint8_t* data, uint8_t len);
+    uint8_t			fillTxBuf(const uint8_t* data, uint8_t len);
 
     /// Appends the transmitter buffer with the data of a mesage to be sent
     /// \param[in] data Array of data bytes to be sent (0 to 255)
     /// \param[in] len Number of data bytes in data
     /// \return false if the resulting message would exceed RF22_MAX_MESSAGE_LEN, else true
-    uint8_t           appendTxBuf(const uint8_t* data, uint8_t len);
+    uint8_t			appendTxBuf(const uint8_t* data, uint8_t len);
 
     /// Internal function to load the next fragment of 
     /// the current message into the transmitter FIFO

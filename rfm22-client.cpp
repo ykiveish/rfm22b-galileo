@@ -54,19 +54,15 @@ main (int argc, char ** argv) {
         std::cout << "Sending to rf22_server" << std::endl;
         // Send a message to rf22_server
         rf22->send(data, sizeof(data));
-
         rf22->waitPacketSent();
         // Now wait for a reply
-
-        if (rf22->waitAvailableTimeout(500)) { 
-            // Should be a message for us now   
-            if (rf22->recv(buf, &len)) {
-                std::cout << "got reply: " << (char*)buf << std::endl;
-            } else {
-                std::cout << "recv failed" << std::endl;
-            }
-        } else {
-            std::cout << "No reply, is rf22_server running?" << std::endl;
+				
+		rf22->waitAvailableTimeout(1000000);
+		
+		if (rf22->recv(buf, &len)) {
+            std::cout << "got response: " << (char*)buf << std::endl;
+		} else {
+            std::cout << "!!! NO RESPONSE !!!" << std::endl;
         }
     }
 

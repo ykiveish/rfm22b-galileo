@@ -27,13 +27,12 @@
 #include "RF22.h"
 #include "mraa.h"
 
-uint8_t amWorking = 0x1;
+bool amWorking = true;
 
 void
 sig_handler (int signo) {
 	if (signo == SIGINT) {
-		std::cout << "SIGNAL [SIGINT]" << std::endl;
-		amWorking = 0x0;
+		amWorking = false;
 	}
 }
 
@@ -50,7 +49,7 @@ main (int argc, char ** argv) {
     uint8_t len = sizeof(buf);
     
     signal (SIGINT, sig_handler);
-    while (amWorking == 0x1) {
+    while (amWorking) {
         // rf22->waitAvailable();
         rf22->waitAvailableTimeout (500);
 
